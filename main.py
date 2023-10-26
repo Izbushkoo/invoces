@@ -25,23 +25,27 @@ class Requisites(BaseModel):
     """Identifying information about invoice in a text."""
 
     invoice_date: str = Field(..., description="Date of invoice from a text")
-    geschäftsadresse_customer_name: str = Field(..., description="geschäftsadresse Name of a company or customer")
+    geschäftsadresse_customer_name: str = Field(..., description="geschäftsadresse Name of a company or "
+                                                                 "customer")
     geschäftsadresse_city: str = Field(..., description="geschäftsadresse city")
     geschäftsadresse_street: str = Field(..., description="geschäftsadresse street")
     geschäftsadresse_state_or_land: Optional[str] = Field(..., description="geschäftsadresse state or land")
     geschäftsadresse_postal_code: str = Field(..., description="geschäftsadresse postal code")
-    # address_without_coutry_code: str = Field(..., description="Geschäftsadresse address from a text, without country code")
+    # address_without_coutry_code: str = Field(..., description="Geschäftsadresse address from a text,
+    # without country code")
     country_code: str = Field(..., description="Customer Country code of invoice from a text")
-    customer_vat_id: Optional[str] = Field(..., description="A value-added tax identification number of customer in a text")
+    customer_vat_id: Optional[str] = Field(..., description="A value-added tax identification number of "
+                                                            "customer in a text")
     bestellnummer_or_contratto: str = Field(..., description="order number - a unique identifier that is "
-                                                             "assigned to an order at the initial stage of the ordering process.")
+                                                             "assigned to an order at the initial stage of the "
+                                                             "ordering process.")
 
     def get_data(self):
         return {
             'A': self.geschäftsadresse_customer_name, 'B': self.customer_vat_id if self.customer_vat_id != "" else None,
             'C': self.geschäftsadresse_street, 'D': self.geschäftsadresse_postal_code,
-            'E': self.geschäftsadresse_city + ', ' + self.geschäftsadresse_state_or_land \
-                if self.geschäftsadresse_state_or_land else self.geschäftsadresse_city,
+            'E': self.geschäftsadresse_city + ', ' + self.geschäftsadresse_state_or_land
+            if self.geschäftsadresse_state_or_land else self.geschäftsadresse_city,
             'N': self.country_code, 'O': self.bestellnummer_or_contratto,
             'P': self.invoice_date
         }
@@ -115,7 +119,7 @@ async def use_chain(input_: str, file: str):
         try:
             result = await chain.arun(input_)
         except Exception:
-            print(f"Error occured while getting response from openai for file {file}")
+            print(f"Error occurred while running chain for getting response for file {file}")
             return
         print(f"Call cost (USD) {cb.total_cost}$")
 
