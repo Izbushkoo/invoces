@@ -3,52 +3,22 @@ import datetime
 import os
 from typing import Optional, List, Union
 
-if "requirements.txt" in os.listdir(os.getcwd()):
-    os.system('pip install -r requirements.txt')
+# if "requirements.txt" in os.listdir(os.getcwd()):
+#     os.system('pip install -r requirements.txt')
 
-import PyPDF2
 from langchain.chains.openai_functions import create_structured_output_chain
 from langchain.callbacks import get_openai_callback
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
-from langchain.pydantic_v1 import BaseModel, Field
 from openpyxl import Workbook
 
-
+from ready_.model_to_extract import ReqModel, Requisites
+from ready_.workers import BillingAddressExtractor
 from dotenv import load_dotenv
 
 
+
 load_dotenv('.env')
-
-
-class Requisites(BaseModel):
-    """Identifying information about invoice in a text."""
-
-    invoice_date: str = Field(..., description="Date of invoice from a text")
-    geschäftsadresse_customer_name: str = Field(..., description="geschäftsadresse Name of a company or "
-                                                                 "customer")
-    geschäftsadresse_city: str = Field(..., description="geschäftsadresse city")
-    geschäftsadresse_street: str = Field(..., description="geschäftsadresse street")
-    geschäftsadresse_state_or_land: Optional[str] = Field(..., description="geschäftsadresse state or land")
-    geschäftsadresse_postal_code: str = Field(..., description="geschäftsadresse postal code")
-    # address_without_coutry_code: str = Field(..., description="Geschäftsadresse address from a text,
-    # without country code")
-    country_code: str = Field(..., description="Customer Country code of invoice from a text")
-    customer_vat_id: Optional[str] = Field(..., description="A value-added tax identification number of "
-                                                            "customer in a text")
-    bestellnummer_or_contratto: str = Field(..., description="order number - a unique identifier that is "
-                                                             "assigned to an order at the initial stage of the "
-                                                             "ordering process.")
-
-    def get_data(self):
-        return {
-            'A': self.geschäftsadresse_customer_name, 'B': self.customer_vat_id if self.customer_vat_id != "" else None,
-            'C': self.geschäftsadresse_street, 'D': self.geschäftsadresse_postal_code,
-            'E': self.geschäftsadresse_city + ', ' + self.geschäftsadresse_state_or_land
-            if self.geschäftsadresse_state_or_land else self.geschäftsadresse_city,
-            'N': self.country_code, 'O': self.bestellnummer_or_contratto,
-            'P': self.invoice_date
-        }
 
 
 class WBWorker:
@@ -98,11 +68,16 @@ class WBWorker:
         self._workbook.save(self._path_to_save)
 
 
+# def get_page_1(path):
+#     print(f"\nRead file {path}...OK")
+#     with open(path, 'rb') as file:
+#         reader = PyPDF2.PdfReader(file)
+#         return reader.pages[0].extract_text()
+
+
 def get_page_1(path):
-    print(f"\nRead file {path}...OK")
-    with open(path, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
-        return reader.pages[0].extract_text()
+    instance = BillingAddressExtractor(path)
+    return f"{instance.get_billing_address()}\nInvoice details{instance.get_delivery_date()}"
 
 
 async def use_chain(input_: str, file: str):
@@ -111,15 +86,16 @@ async def use_chain(input_: str, file: str):
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a world class algorithm for extracting information in structured formats."),
         ("human", "Use the given format to extract information from the following text: {input}"),
-        ("human", "Tip: Make sure to answer in the correct format and all properties encolsed in double quotes"),
+        ("human", "Tip: Make sure to answer in the correct format and all properties encolsed in double quotes"
+                  "and all dates in format '%d.%m.%Y'"),
     ])
-    chain = create_structured_output_chain(Requisites, model, prompt)
+    chain = create_structured_output_chain(ReqModel, model, prompt)
     await asyncio.sleep(0.01)
     with get_openai_callback() as cb:
         try:
             result = await chain.arun(input_)
-        except Exception:
-            print(f"Error occurred while running chain for getting response for file {file}")
+        except Exception as er:
+            print(er)
             return
         print(f"Call cost (USD) {cb.total_cost}$")
 
@@ -165,9 +141,10 @@ async def main():
         )
 
     results = await asyncio.gather(*tasks)
-
-    with WBWorker(path_to_save=path_to_dir) as w:
-        w.append_rows(results)
+    for r in results:
+        print(r)
+    # with WBWorker(path_to_save=path_to_dir) as w:
+    #     w.append_rows(results)
 
     print("\nDone")
 
